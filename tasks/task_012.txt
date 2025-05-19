@@ -1,0 +1,376 @@
+# Task ID: 12
+# Title: Demo Performance Tests Implementation
+# Status: pending
+# Dependencies: 6, 7
+# Priority: low
+# Description: Create demonstration performance tests using the framework with k6 integration to showcase load testing capabilities for API endpoints.
+# Details:
+1. Create performance test scenarios:
+   - Load test for authentication endpoints
+   - Stress test for data-intensive operations
+   - Endurance test for long-running operations
+   - Spike test for sudden traffic increases
+
+2. Implement performance metrics collection:
+   - Response time measurements
+   - Throughput calculations
+   - Error rate monitoring
+   - Resource utilization tracking
+
+3. Create threshold definitions:
+   - Response time thresholds
+   - Error rate thresholds
+   - Throughput thresholds
+   - Custom metric thresholds
+
+4. Implement result visualization:
+   - Time-series data visualization
+   - Histogram and percentile charts
+   - Comparison with baseline results
+   - Trend analysis
+
+5. Add integration with monitoring systems:
+   - Metrics export to monitoring tools
+   - Alert generation for threshold violations
+   - Performance trend reporting
+
+Example implementation:
+```typescript
+// AuthLoadTest.ts
+export class AuthLoadTest extends LoadTestScenario {
+  constructor(options: LoadTestOptions) {
+    super(options);
+  }
+
+  defineScenario(): string {
+    return `
+      import http from 'k6/http';
+      import { check, sleep } from 'k6';
+      import { Rate } from 'k6/metrics';
+      
+      // Custom metrics
+      const errorRate = new Rate('error_rate');
+      
+      // Test configuration
+      export const options = {
+        vus: ${this.options.virtualUsers},
+        duration: '${this.options.duration}',
+        thresholds: {
+          http_req_duration: ['p(95)<500'], // 95% of requests should be below 500ms
+          'http_req_duration{name:login}': ['p(95)<300'], // 95% of login requests should be below 300ms
+          error_rate: ['rate<0.1'], // Error rate should be below 10%
+        },
+      };
+      
+      // Test setup
+      const BASE_URL = '${this.options.baseUrl}';
+      const users = JSON.parse(open('./users.json'));
+      
+      // Main test function
+      export default function() {
+        // Register user
+        const registerUrl = `${BASE_URL}/users`;
+        const registerPayload = {
+          name: `User ${__VU}-${__ITER}`,
+          email: `user${__VU}_${__ITER}@example.com`,
+          password: 'Password123'
+        };
+        
+        const registerResponse = http.post(registerUrl, JSON.stringify(registerPayload), {
+          headers: { 'Content-Type': 'application/json' },
+          tags: { name: 'register' }
+        });
+        
+        // Check registration response
+        const registerCheck = check(registerResponse, {
+          'register status is 201': (r) => r.status === 201 || r.status === 400, // 400 if user exists
+        });
+        errorRate.add(!registerCheck);
+        
+        sleep(1);
+        
+        // Login user
+        const loginUrl = `${BASE_URL}/users/login`;
+        const loginPayload = {
+          email: registerPayload.email,
+          password: registerPayload.password
+        };
+        
+        const loginResponse = http.post(loginUrl, JSON.stringify(loginPayload), {
+          headers: { 'Content-Type': 'application/json' },
+          tags: { name: 'login' }
+        });
+        
+        // Check login response
+        const loginCheck = check(loginResponse, {
+          'login status is 200': (r) => r.status === 200,
+          'login has token': (r) => r.json('token') !== undefined,
+        });
+        errorRate.add(!loginCheck);
+        
+        if (loginCheck) {
+          const token = loginResponse.json('token');
+          
+          // Get user profile
+          const profileUrl = `${BASE_URL}/users/me`;
+          const profileResponse = http.get(profileUrl, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            tags: { name: 'profile' }
+          });
+          
+          // Check profile response
+          const profileCheck = check(profileResponse, {
+            'profile status is 200': (r) => r.status === 200,
+            'profile has correct email': (r) => r.json('email') === registerPayload.email,
+          });
+          errorRate.add(!profileCheck);
+          
+          sleep(1);
+          
+          // Logout user
+          const logoutUrl = `${BASE_URL}/users/logout`;
+          const logoutResponse = http.post(logoutUrl, null, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            tags: { name: 'logout' }
+          });
+          
+          // Check logout response
+          const logoutCheck = check(logoutResponse, {
+            'logout status is 200': (r) => r.status === 200,
+          });
+          errorRate.add(!logoutCheck);
+        }
+        
+        sleep(2);
+      }
+    `;
+  }
+}
+
+// ContactsLoadTest.ts
+export class ContactsLoadTest extends LoadTestScenario {
+  constructor(options: LoadTestOptions) {
+    super(options);
+  }
+
+  defineScenario(): string {
+    return `
+      import http from 'k6/http';
+      import { check, sleep } from 'k6';
+      import { Rate, Trend } from 'k6/metrics';
+      
+      // Custom metrics
+      const errorRate = new Rate('error_rate');
+      const contactCreationTime = new Trend('contact_creation_time');
+      
+      // Test configuration
+      export const options = {
+        stages: [
+          { duration: '1m', target: 10 }, // Ramp up to 10 users
+          { duration: '3m', target: 10 }, // Stay at 10 users
+          { duration: '1m', target: 20 }, // Ramp up to 20 users
+          { duration: '3m', target: 20 }, // Stay at 20 users
+          { duration: '1m', target: 0 },  // Ramp down to 0 users
+        ],
+        thresholds: {
+          http_req_duration: ['p(95)<1000'], // 95% of requests should be below 1s
+          'http_req_duration{name:create_contact}': ['p(95)<500'], // 95% of contact creation should be below 500ms
+          error_rate: ['rate<0.1'], // Error rate should be below 10%
+          contact_creation_time: ['p(95)<600'], // 95% of contact creation processing time should be below 600ms
+        },
+      };
+      
+      // Test setup
+      const BASE_URL = '${this.options.baseUrl}';
+      let token = ''; // Will be set after login
+      
+      // Helper function to generate random contact data
+      function generateContact() {
+        const id = Math.floor(Math.random() * 10000);
+        return {
+          firstName: `First${id}`,
+          lastName: `Last${id}`,
+          email: `contact${id}@example.com`,
+          phone: `123${id.toString().padStart(7, '0')}`
+        };
+      }
+      
+      // Setup function - runs once per VU
+      export function setup() {
+        // Login to get token
+        const loginUrl = `${BASE_URL}/users/login`;
+        const loginPayload = {
+          email: 'loadtest@example.com',
+          password: 'Password123'
+        };
+        
+        const loginResponse = http.post(loginUrl, JSON.stringify(loginPayload), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        check(loginResponse, {
+          'login successful': (r) => r.status === 200,
+        });
+        
+        return { token: loginResponse.json('token') };
+      }
+      
+      // Teardown function - runs once after all VUs complete
+      export function teardown(data) {
+        // Logout
+        const logoutUrl = `${BASE_URL}/users/logout`;
+        http.post(logoutUrl, null, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+      
+      // Main test function
+      export default function(data) {
+        const token = data.token;
+        const authHeaders = {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        };
+        
+        // Create contact
+        const createUrl = `${BASE_URL}/contacts`;
+        const contactData = generateContact();
+        
+        const startTime = new Date();
+        const createResponse = http.post(createUrl, JSON.stringify(contactData), {
+          headers: authHeaders,
+          tags: { name: 'create_contact' }
+        });
+        const endTime = new Date();
+        
+        // Record contact creation time
+        contactCreationTime.add(endTime - startTime);
+        
+        // Check create response
+        const createCheck = check(createResponse, {
+          'create status is 201': (r) => r.status === 201,
+          'create returns contact data': (r) => r.json('firstName') === contactData.firstName,
+        });
+        errorRate.add(!createCheck);
+        
+        if (createCheck) {
+          const contactId = createResponse.json('_id');
+          
+          sleep(1);
+          
+          // Get contact
+          const getUrl = `${BASE_URL}/contacts/${contactId}`;
+          const getResponse = http.get(getUrl, {
+            headers: authHeaders,
+            tags: { name: 'get_contact' }
+          });
+          
+          // Check get response
+          const getCheck = check(getResponse, {
+            'get status is 200': (r) => r.status === 200,
+            'get returns correct contact': (r) => r.json('firstName') === contactData.firstName,
+          });
+          errorRate.add(!getCheck);
+          
+          sleep(1);
+          
+          // Update contact
+          const updateUrl = `${BASE_URL}/contacts/${contactId}`;
+          const updateData = { firstName: `Updated${contactData.firstName}` };
+          
+          const updateResponse = http.patch(updateUrl, JSON.stringify(updateData), {
+            headers: authHeaders,
+            tags: { name: 'update_contact' }
+          });
+          
+          // Check update response
+          const updateCheck = check(updateResponse, {
+            'update status is 200': (r) => r.status === 200,
+            'update returns updated data': (r) => r.json('firstName') === updateData.firstName,
+          });
+          errorRate.add(!updateCheck);
+          
+          sleep(1);
+          
+          // Delete contact
+          const deleteUrl = `${BASE_URL}/contacts/${contactId}`;
+          const deleteResponse = http.del(deleteUrl, null, {
+            headers: authHeaders,
+            tags: { name: 'delete_contact' }
+          });
+          
+          // Check delete response
+          const deleteCheck = check(deleteResponse, {
+            'delete status is 200': (r) => r.status === 200,
+          });
+          errorRate.add(!deleteCheck);
+        }
+        
+        sleep(3);
+      }
+    `;
+  }
+}
+
+// PerformanceTestRunner.ts
+export class PerformanceTestRunner {
+  async runAuthLoadTest(): Promise<void> {
+    const authTest = new AuthLoadTest({
+      virtualUsers: 50,
+      duration: '5m',
+      baseUrl: 'https://thinking-tester-contact-list.herokuapp.com/api',
+      thresholds: {
+        'http_req_duration': ['p(95)<500'],
+        'error_rate': ['rate<0.1']
+      }
+    });
+    
+    const result = await authTest.execute();
+    
+    console.log('Auth Load Test Results:');
+    console.log(`Total requests: ${result.metrics.http_reqs.values.count}`);
+    console.log(`Average response time: ${result.metrics.http_req_duration.values.avg}ms`);
+    console.log(`95th percentile: ${result.metrics.http_req_duration.values.p(95)}ms`);
+    console.log(`Error rate: ${result.metrics.error_rate.values.rate * 100}%`);
+    console.log(`Test passed: ${result.passed}`);
+  }
+
+  async runContactsLoadTest(): Promise<void> {
+    const contactsTest = new ContactsLoadTest({
+      virtualUsers: 20,
+      duration: '10m',
+      baseUrl: 'https://thinking-tester-contact-list.herokuapp.com/api',
+      thresholds: {
+        'http_req_duration': ['p(95)<1000'],
+        'error_rate': ['rate<0.1']
+      }
+    });
+    
+    const result = await contactsTest.execute();
+    
+    console.log('Contacts Load Test Results:');
+    console.log(`Total requests: ${result.metrics.http_reqs.values.count}`);
+    console.log(`Average response time: ${result.metrics.http_req_duration.values.avg}ms`);
+    console.log(`95th percentile: ${result.metrics.http_req_duration.values.p(95)}ms`);
+    console.log(`Error rate: ${result.metrics.error_rate.values.rate * 100}%`);
+    console.log(`Test passed: ${result.passed}`);
+  }
+}
+```
+
+# Test Strategy:
+1. Create various load test scenarios (load, stress, endurance, spike)
+2. Test with different virtual user counts and durations
+3. Verify threshold validations for response times and error rates
+4. Test with different load patterns (constant, ramp-up, step)
+5. Validate metrics collection and reporting
+6. Compare results against baseline performance

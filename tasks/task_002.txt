@@ -1,0 +1,91 @@
+# Task ID: 2
+# Title: Core Framework Architecture Implementation
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Develop the core architecture of the framework including base classes, interfaces, and utilities that will be used across all testing types.
+# Details:
+1. Create base interfaces and abstract classes for test components:
+   - `BaseTest` abstract class with common test lifecycle methods
+   - `BaseConfig` interface for configuration management
+   - `BaseReporter` abstract class for reporting integration
+   - `BaseFixture` for test fixtures and data management
+
+2. Implement configuration management system:
+   - Environment-specific configuration (dev, staging, prod)
+   - Browser and device configurations
+   - Test execution parameters
+
+3. Create utility classes:
+   - Logger utility with different log levels
+   - Test data generators and managers
+   - Assertion helpers extending Playwright's expect
+   - Wait and retry mechanisms
+
+4. Implement hook system for extending framework functionality:
+   - Before/after test hooks
+   - Before/after suite hooks
+   - Global setup/teardown hooks
+
+5. Create factory classes for test components:
+   - Page factory for UI components
+   - API client factory
+   - Mobile screen factory
+
+Example core class structure:
+```typescript
+// BaseTest.ts
+export abstract class BaseTest {
+  protected context: BrowserContext;
+  protected config: TestConfig;
+
+  constructor(config: TestConfig) {
+    this.config = config;
+  }
+
+  async setup(): Promise<void> {
+    // Common setup logic
+  }
+
+  async teardown(): Promise<void> {
+    // Common teardown logic
+  }
+
+  abstract executeTest(): Promise<void>;
+}
+
+// ConfigManager.ts
+export class ConfigManager {
+  private static instance: ConfigManager;
+  private config: Record<string, any>;
+
+  private constructor() {
+    this.config = this.loadConfig();
+  }
+
+  static getInstance(): ConfigManager {
+    if (!ConfigManager.instance) {
+      ConfigManager.instance = new ConfigManager();
+    }
+    return ConfigManager.instance;
+  }
+
+  private loadConfig(): Record<string, any> {
+    const env = process.env.TEST_ENV || 'dev';
+    // Load and merge configurations based on environment
+    return {}; // Placeholder
+  }
+
+  getConfig<T>(key: string, defaultValue?: T): T {
+    // Get config with type safety
+    return this.config[key] || defaultValue;
+  }
+}
+```
+
+# Test Strategy:
+1. Create unit tests for core components using Playwright Test
+2. Verify that configuration management works across different environments
+3. Test hook system with mock implementations
+4. Validate factory patterns with test instances
+5. Ensure all core utilities function as expected with unit tests

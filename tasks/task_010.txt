@@ -1,0 +1,240 @@
+# Task ID: 10
+# Title: Demo API Tests Implementation
+# Status: pending
+# Dependencies: 4, 7
+# Priority: medium
+# Description: Create demonstration API tests using the framework for the API documented at https://documenter.getpostman.com/view/4012288/TzK2bEa8 to showcase API testing capabilities.
+# Details:
+1. Create API client for the Contact List API:
+   - Authentication endpoints
+   - User endpoints
+   - Contact endpoints
+
+2. Implement JSON Schema validation:
+   - User schema
+   - Contact schema
+   - Error response schemas
+
+3. Create test data generators:
+   - User credentials
+   - Contact information
+   - Invalid data for negative testing
+
+4. Implement test scenarios:
+   - User registration and authentication
+   - Contact CRUD operations
+   - Validation and error handling
+   - Authorization testing
+
+5. Add API mocking examples:
+   - Mock server setup
+   - Response stubbing
+   - Conditional responses
+
+Example implementation:
+```typescript
+// ContactApiClient.ts
+export class ContactApiClient extends BaseApiClient {
+  constructor(request: APIRequestContext, baseUrl: string) {
+    super(request, baseUrl);
+  }
+
+  // Authentication endpoints
+  async register(userData: UserData): Promise<ApiResponse<UserResponse>> {
+    return this.post<UserResponse>('/users', userData);
+  }
+
+  async login(credentials: LoginCredentials): Promise<ApiResponse<LoginResponse>> {
+    return this.post<LoginResponse>('/users/login', credentials);
+  }
+
+  async logout(token: string): Promise<ApiResponse<void>> {
+    return this.post<void>('/users/logout', {}, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+  }
+
+  // User endpoints
+  async getCurrentUser(token: string): Promise<ApiResponse<UserResponse>> {
+    return this.get<UserResponse>('/users/me', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+  }
+
+  async updateUser(token: string, userData: Partial<UserData>): Promise<ApiResponse<UserResponse>> {
+    return this.patch<UserResponse>('/users/me', userData, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+  }
+
+  async deleteUser(token: string): Promise<ApiResponse<void>> {
+    return this.delete<void>('/users/me', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+  }
+
+  // Contact endpoints
+  async getContacts(token: string): Promise<ApiResponse<ContactResponse[]>> {
+    return this.get<ContactResponse[]>('/contacts', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+  }
+
+  async getContact(token: string, contactId: string): Promise<ApiResponse<ContactResponse>> {
+    return this.get<ContactResponse>(`/contacts/${contactId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+  }
+
+  async createContact(token: string, contactData: ContactData): Promise<ApiResponse<ContactResponse>> {
+    return this.post<ContactResponse>('/contacts', contactData, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+  }
+
+  async updateContact(token: string, contactId: string, contactData: Partial<ContactData>): Promise<ApiResponse<ContactResponse>> {
+    return this.patch<ContactResponse>(`/contacts/${contactId}`, contactData, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+  }
+
+  async deleteContact(token: string, contactId: string): Promise<ApiResponse<void>> {
+    return this.delete<void>(`/contacts/${contactId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+  }
+}
+
+// ContactApiSchemas.ts
+export const userSchema = {
+  type: 'object',
+  required: ['_id', 'name', 'email'],
+  properties: {
+    _id: { type: 'string' },
+    name: { type: 'string' },
+    email: { type: 'string', format: 'email' },
+    age: { type: 'number' },
+    createdAt: { type: 'string', format: 'date-time' },
+    updatedAt: { type: 'string', format: 'date-time' }
+  }
+};
+
+export const contactSchema = {
+  type: 'object',
+  required: ['_id', 'firstName', 'lastName', 'owner'],
+  properties: {
+    _id: { type: 'string' },
+    firstName: { type: 'string' },
+    lastName: { type: 'string' },
+    email: { type: 'string', format: 'email' },
+    phone: { type: 'string' },
+    owner: { type: 'string' },
+    createdAt: { type: 'string', format: 'date-time' },
+    updatedAt: { type: 'string', format: 'date-time' }
+  }
+};
+
+// ContactApiTest.ts
+export class ContactApiTest extends BaseApiTest {
+  private apiClient: ContactApiClient;
+  private schemaValidator: SchemaValidator;
+  private token: string = '';
+
+  constructor() {
+    super();
+    this.apiClient = new ContactApiClient(this.request, 'https://thinking-tester-contact-list.herokuapp.com/api');
+    this.schemaValidator = new SchemaValidator();
+    this.schemaValidator.registerSchema('user', userSchema);
+    this.schemaValidator.registerSchema('contact', contactSchema);
+  }
+
+  async setup(): Promise<void> {
+    await super.setup();
+    
+    // Register and login a test user
+    const userData = {
+      name: `Test User ${Date.now()}`,
+      email: `test${Date.now()}@example.com`,
+      password: 'Password123'
+    };
+    
+    try {
+      await this.apiClient.register(userData);
+    } catch (e) {
+      // User might already exist, continue to login
+    }
+    
+    const loginResponse = await this.apiClient.login({
+      email: userData.email,
+      password: userData.password
+    });
+    
+    this.token = loginResponse.body.token;
+  }
+
+  async teardown(): Promise<void> {
+    // Clean up - delete user if needed
+    if (this.token) {
+      try {
+        await this.apiClient.deleteUser(this.token);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }
+    
+    await super.teardown();
+  }
+
+  async executeTest(): Promise<void> {
+    // Test getting current user
+    const userResponse = await this.apiClient.getCurrentUser(this.token);
+    expect(userResponse.status).toBe(200);
+    expect(this.schemaValidator.validate(userResponse.body, 'user').valid).toBeTruthy();
+    
+    // Test creating a contact
+    const contactData = {
+      firstName: 'John',
+      lastName: 'Doe',
+      email: 'john.doe@example.com',
+      phone: '1234567890'
+    };
+    
+    const createResponse = await this.apiClient.createContact(this.token, contactData);
+    expect(createResponse.status).toBe(201);
+    expect(this.schemaValidator.validate(createResponse.body, 'contact').valid).toBeTruthy();
+    
+    const contactId = createResponse.body._id;
+    
+    // Test getting a contact
+    const getResponse = await this.apiClient.getContact(this.token, contactId);
+    expect(getResponse.status).toBe(200);
+    expect(getResponse.body.firstName).toBe(contactData.firstName);
+    
+    // Test updating a contact
+    const updateData = { firstName: 'Jane' };
+    const updateResponse = await this.apiClient.updateContact(this.token, contactId, updateData);
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.firstName).toBe(updateData.firstName);
+    
+    // Test deleting a contact
+    const deleteResponse = await this.apiClient.deleteContact(this.token, contactId);
+    expect(deleteResponse.status).toBe(200);
+    
+    // Verify contact is deleted
+    try {
+      await this.apiClient.getContact(this.token, contactId);
+      fail('Contact should be deleted');
+    } catch (e) {
+      expect(e.response.status).toBe(404);
+    }
+  }
+}
+```
+
+# Test Strategy:
+1. Create end-to-end API test flows
+2. Test both positive and negative scenarios
+3. Verify schema validation for all responses
+4. Test authentication and authorization
+5. Validate error handling and edge cases
+6. Test API performance with different payload sizes

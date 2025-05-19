@@ -1,0 +1,166 @@
+# Task ID: 9
+# Title: Demo UI Tests Implementation
+# Status: pending
+# Dependencies: 3, 7
+# Priority: medium
+# Description: Create demonstration UI tests using the framework for the Contact List application (https://thinking-tester-contact-list.herokuapp.com/) to showcase framework capabilities.
+# Details:
+1. Create Page Objects for Contact List application:
+   - Login page
+   - Registration page
+   - Contact list page
+   - Contact details page
+   - Add/Edit contact page
+
+2. Implement Component Objects for reusable UI elements:
+   - Navigation menu
+   - Contact card
+   - Form inputs
+   - Validation messages
+
+3. Create test data generators:
+   - User credentials
+   - Contact information
+   - Invalid data for negative testing
+
+4. Implement test scenarios:
+   - User registration and login
+   - Contact CRUD operations
+   - Validation and error handling
+   - Navigation and state management
+
+5. Add visual testing examples:
+   - Layout verification
+   - Responsive design testing
+   - Visual regression tests
+
+Example implementation:
+```typescript
+// LoginPage.ts
+export class LoginPage extends BasePage {
+  constructor(page: Page, baseUrl: string) {
+    super(page, baseUrl, '/login');
+  }
+
+  defineSelectors(): Record<string, string> {
+    return {
+      emailInput: '#email',
+      passwordInput: '#password',
+      loginButton: '#submit',
+      signUpLink: '#signup',
+      errorMessage: '#error'
+    };
+  }
+
+  async login(email: string, password: string): Promise<void> {
+    await this.page.fill(this.selectors.emailInput, email);
+    await this.page.fill(this.selectors.passwordInput, password);
+    await this.page.click(this.selectors.loginButton);
+    // Wait for navigation or error
+    try {
+      await this.page.waitForURL('**/contactList', { timeout: 5000 });
+    } catch (e) {
+      // Login failed, check for error message
+    }
+  }
+
+  async navigateToSignUp(): Promise<void> {
+    await this.page.click(this.selectors.signUpLink);
+    await this.page.waitForURL('**/signup');
+  }
+
+  async getErrorMessage(): Promise<string> {
+    const errorElement = this.page.locator(this.selectors.errorMessage);
+    if (await errorElement.isVisible()) {
+      return await errorElement.textContent() || '';
+    }
+    return '';
+  }
+}
+
+// ContactListPage.ts
+export class ContactListPage extends BasePage {
+  constructor(page: Page, baseUrl: string) {
+    super(page, baseUrl, '/contactList');
+  }
+
+  defineSelectors(): Record<string, string> {
+    return {
+      addContactButton: '#add-contact',
+      logoutButton: '#logout',
+      contactItems: '.contact-item',
+      contactName: '.contact-name',
+      contactEmail: '.contact-email',
+      contactPhone: '.contact-phone',
+      deleteButton: '.contact-delete',
+      editButton: '.contact-edit'
+    };
+  }
+
+  async addNewContact(): Promise<void> {
+    await this.page.click(this.selectors.addContactButton);
+    await this.page.waitForURL('**/add-contact');
+  }
+
+  async logout(): Promise<void> {
+    await this.page.click(this.selectors.logoutButton);
+    await this.page.waitForURL('**/login');
+  }
+
+  async getContactCount(): Promise<number> {
+    return await this.page.locator(this.selectors.contactItems).count();
+  }
+
+  async clickContact(name: string): Promise<void> {
+    const contacts = this.page.locator(this.selectors.contactItems);
+    const count = await contacts.count();
+    
+    for (let i = 0; i < count; i++) {
+      const contact = contacts.nth(i);
+      const contactName = await contact.locator(this.selectors.contactName).textContent();
+      
+      if (contactName?.includes(name)) {
+        await contact.click();
+        await this.page.waitForURL('**/contact-details/**');
+        break;
+      }
+    }
+  }
+}
+
+// LoginTest.ts
+export class LoginTest extends BaseTest {
+  async executeTest(): Promise<void> {
+    const loginPage = new LoginPage(this.page, this.config.baseUrl);
+    
+    // Navigate to login page
+    await loginPage.navigate();
+    
+    // Verify page loaded correctly
+    expect(await loginPage.isCurrentPage()).toBeTruthy();
+    
+    // Test valid login
+    await loginPage.login('test@example.com', 'Password123');
+    
+    // Verify successful login
+    const contactListPage = new ContactListPage(this.page, this.config.baseUrl);
+    expect(await contactListPage.isCurrentPage()).toBeTruthy();
+    
+    // Test logout
+    await contactListPage.logout();
+    expect(await loginPage.isCurrentPage()).toBeTruthy();
+    
+    // Test invalid login
+    await loginPage.login('invalid@example.com', 'wrongpassword');
+    expect(await loginPage.getErrorMessage()).toContain('Incorrect email or password');
+  }
+}
+```
+
+# Test Strategy:
+1. Create end-to-end tests for all main user flows
+2. Test both positive and negative scenarios
+3. Verify visual aspects with screenshot comparisons
+4. Test responsive design with different viewport sizes
+5. Validate error handling and edge cases
+6. Run tests in parallel to verify framework stability

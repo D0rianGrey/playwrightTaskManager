@@ -1,0 +1,152 @@
+# Task ID: 8
+# Title: CI/CD Integration with TeamCity
+# Status: pending
+# Dependencies: 7
+# Priority: medium
+# Description: Implement integration with TeamCity for continuous integration and delivery, including test execution, reporting, and artifact management.
+# Details:
+1. Create TeamCity configuration templates:
+   - Build configuration for test execution
+   - Reporting configuration for test results
+   - Artifact management for test artifacts
+
+2. Implement TeamCity-specific reporters:
+   - Test result reporting in TeamCity format
+   - Build status updates
+   - Test metadata reporting
+
+3. Create Docker containers for test execution:
+   - Base container with framework dependencies
+   - Browser-specific containers
+   - Mobile testing containers
+
+4. Implement pipeline configuration:
+   - Multi-stage pipeline definition
+   - Parallel test execution
+   - Environment-specific configurations
+
+5. Add deployment automation:
+   - Framework version management
+   - Dependency updates
+   - Documentation generation
+
+Example implementation:
+```typescript
+// TeamCityReporter.ts
+export class TeamCityReporter implements Reporter {
+  private flowId: string;
+
+  constructor() {
+    this.flowId = crypto.randomUUID();
+  }
+
+  onBegin(config: FullConfig, suite: Suite): void {
+    console.log(`##teamcity[testSuiteStarted name='${escape(suite.title)}' flowId='${this.flowId}']`);
+  }
+
+  onTestBegin(test: TestCase, result: TestResult): void {
+    console.log(`##teamcity[testStarted name='${escape(test.title)}' flowId='${this.flowId}']`);
+  }
+
+  onTestEnd(test: TestCase, result: TestResult): void {
+    const duration = result.duration;
+    
+    if (result.status === 'failed') {
+      const message = result.error ? escape(result.error.message) : '';
+      const stack = result.error && result.error.stack ? escape(result.error.stack) : '';
+      console.log(`##teamcity[testFailed name='${escape(test.title)}' message='${message}' details='${stack}' flowId='${this.flowId}']`);
+    } else if (result.status === 'skipped') {
+      console.log(`##teamcity[testIgnored name='${escape(test.title)}' flowId='${this.flowId}']`);
+    }
+    
+    console.log(`##teamcity[testFinished name='${escape(test.title)}' duration='${duration}' flowId='${this.flowId}']`);
+  }
+
+  onEnd(result: FullResult): void {
+    console.log(`##teamcity[testSuiteFinished name='${escape(result.rootSuite.title)}' flowId='${this.flowId}']`);
+  }
+}
+
+// TeamCityIntegration.ts
+export class TeamCityIntegration {
+  private config: TeamCityConfig;
+
+  constructor(config: TeamCityConfig) {
+    this.config = config;
+  }
+
+  async publishArtifacts(artifactsPath: string, artifactName: string): Promise<void> {
+    // Use TeamCity REST API to publish artifacts
+    const url = `${this.config.serverUrl}/app/rest/builds/id:${this.config.buildId}/artifacts/content/${artifactName}`;    
+    // Upload artifacts
+  }
+
+  async setBuildStatus(status: 'SUCCESS' | 'FAILURE', message: string): Promise<void> {
+    // Use TeamCity REST API to set build status
+    const url = `${this.config.serverUrl}/app/rest/builds/id:${this.config.buildId}/status`;
+    // Set build status
+  }
+
+  async addBuildTag(tag: string): Promise<void> {
+    // Use TeamCity REST API to add build tag
+    const url = `${this.config.serverUrl}/app/rest/builds/id:${this.config.buildId}/tags`;
+    // Add build tag
+  }
+}
+
+// Dockerfile example
+/*
+FROM node:18-slim
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libgdk-pixbuf2.0-0 \
+    libnspr4 \
+    libnss3 \
+    libx11-6 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxrandr2 \
+    xdg-utils \
+    --no-install-recommends
+
+# Install Playwright browsers
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+WORKDIR /app
+
+# Copy package.json and install dependencies
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Install Playwright browsers
+RUN npx playwright install --with-deps chromium firefox webkit
+
+# Copy framework files
+COPY . .
+
+# Build TypeScript
+RUN npm run build
+
+CMD ["npm", "test"]
+*/
+```
+
+# Test Strategy:
+1. Create unit tests for TeamCity reporter
+2. Test artifact publishing with mock TeamCity API
+3. Verify Docker container builds and functionality
+4. Test pipeline configuration with different environments
+5. Create integration tests that simulate CI/CD workflow
+6. Validate build status and tag management

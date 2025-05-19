@@ -1,0 +1,134 @@
+# Task ID: 5
+# Title: Mobile Testing Integration with Appium
+# Status: pending
+# Dependencies: 2, 3
+# Priority: medium
+# Description: Integrate Appium with the framework for native mobile application testing on Android and iOS platforms, while maintaining compatibility with the existing framework architecture.
+# Details:
+1. Create Appium integration layer:
+   - Driver management for Android and iOS
+   - Device configuration and capabilities
+   - Session management and lifecycle
+
+2. Implement mobile-specific Page Object Model:
+   - Mobile screen base class
+   - Mobile component base class
+   - Touch and gesture utilities
+
+3. Create device management utilities:
+   - Device selection and configuration
+   - Emulator/simulator management
+   - Real device connection handling
+
+4. Implement mobile-specific utilities:
+   - Native app interaction helpers
+   - Mobile-specific wait conditions
+   - App state management (install, uninstall, etc.)
+
+5. Create bridge between Playwright and Appium:
+   - Unified test execution interface
+   - Shared reporting and logging
+   - Common configuration management
+
+Example implementation:
+```typescript
+// AppiumDriver.ts
+export class AppiumDriver {
+  private driver: WebdriverIO.Browser;
+  private config: MobileConfig;
+
+  constructor(config: MobileConfig) {
+    this.config = config;
+  }
+
+  async initialize(): Promise<void> {
+    const capabilities = this.buildCapabilities();
+    this.driver = await remote({
+      protocol: 'http',
+      hostname: this.config.appiumServer.host,
+      port: this.config.appiumServer.port,
+      path: '/wd/hub',
+      capabilities,
+      logLevel: 'error'
+    });
+  }
+
+  private buildCapabilities(): WebDriver.Capabilities {
+    const base = {
+      'appium:newCommandTimeout': 240,
+      'appium:connectHardwareKeyboard': true
+    };
+
+    if (this.config.platform === 'android') {
+      return {
+        ...base,
+        platformName: 'Android',
+        'appium:deviceName': this.config.deviceName,
+        'appium:platformVersion': this.config.platformVersion,
+        'appium:app': this.config.appPath,
+        'appium:automationName': 'UiAutomator2'
+      };
+    } else {
+      return {
+        ...base,
+        platformName: 'iOS',
+        'appium:deviceName': this.config.deviceName,
+        'appium:platformVersion': this.config.platformVersion,
+        'appium:app': this.config.appPath,
+        'appium:automationName': 'XCUITest'
+      };
+    }
+  }
+
+  getDriver(): WebdriverIO.Browser {
+    if (!this.driver) {
+      throw new Error('Driver not initialized');
+    }
+    return this.driver;
+  }
+
+  async close(): Promise<void> {
+    if (this.driver) {
+      await this.driver.deleteSession();
+    }
+  }
+}
+
+// MobileScreen.ts
+export abstract class MobileScreen {
+  protected driver: WebdriverIO.Browser;
+  protected selectors: Record<string, string>;
+
+  constructor(driver: WebdriverIO.Browser) {
+    this.driver = driver;
+    this.selectors = this.defineSelectors();
+  }
+
+  abstract defineSelectors(): Record<string, string>;
+
+  async waitForScreen(timeout = 10000): Promise<void> {
+    // Implement screen-specific wait logic
+  }
+
+  async isCurrentScreen(): Promise<boolean> {
+    // Verify we're on the expected screen
+    return true; // Placeholder
+  }
+
+  async getElement(name: string): Promise<WebdriverIO.Element> {
+    const selector = this.selectors[name];
+    if (!selector) {
+      throw new Error(`Selector '${name}' not defined for screen`);
+    }
+    return await this.driver.$(selector);
+  }
+}
+```
+
+# Test Strategy:
+1. Create unit tests for Appium integration components
+2. Test mobile screen and component implementations
+3. Verify device management utilities with emulators
+4. Test the bridge between Playwright and Appium
+5. Create integration tests for Android and iOS platforms
+6. Validate gesture and touch interactions

@@ -1,0 +1,161 @@
+# Task ID: 7
+# Title: Reporting System with Allure Integration
+# Status: pending
+# Dependencies: 3, 4, 5, 6
+# Priority: high
+# Description: Implement a comprehensive reporting system using Allure, integrated with Playwright Test, to provide detailed test execution reports, screenshots, and performance metrics.
+# Details:
+1. Create Allure reporter integration:
+   - Custom Playwright Test reporter
+   - Test result mapping to Allure format
+   - Attachment handling for screenshots and logs
+
+2. Implement advanced reporting features:
+   - Test categorization and grouping
+   - Environment information collection
+   - Test history and trends
+
+3. Add screenshot and video capture:
+   - Automatic screenshot on test failure
+   - Video recording of test execution
+   - Visual evidence management
+
+4. Implement logging integration:
+   - Log capture and formatting
+   - Log level filtering
+   - Context-aware logging
+
+5. Create dashboard for test results:
+   - Summary statistics and trends
+   - Failure analysis and categorization
+   - Test execution timeline
+
+Example implementation:
+```typescript
+// AllureReporter.ts
+export class AllureReporter implements Reporter {
+  private allure: AllureRuntime;
+  private suites: Map<string, AllureTest>;
+  private currentTest: AllureTest | null;
+
+  constructor() {
+    this.allure = new AllureRuntime({ resultsDir: './allure-results' });
+    this.suites = new Map();
+    this.currentTest = null;
+  }
+
+  onBegin(config: FullConfig, suite: Suite): void {
+    // Setup Allure reporting
+    this.allure.startGroup('Test Execution');
+  }
+
+  onTestBegin(test: TestCase, result: TestResult): void {
+    const suite = this.getSuite(test.parent);
+    this.currentTest = suite.startTest(test.title);
+    
+    // Add test metadata
+    this.currentTest.addLabel('suite', test.parent.title);
+    this.currentTest.addLabel('framework', 'playwright');
+    
+    // Add test parameters if available
+    if (test.parameters) {
+      for (const [key, value] of Object.entries(test.parameters)) {
+        this.currentTest.addParameter(key, String(value));
+      }
+    }
+  }
+
+  onTestEnd(test: TestCase, result: TestResult): void {
+    if (!this.currentTest) return;
+    
+    // Set test status
+    if (result.status === 'passed') {
+      this.currentTest.setStatus(Status.PASSED);
+    } else if (result.status === 'failed') {
+      this.currentTest.setStatus(Status.FAILED);
+      if (result.error) {
+        this.currentTest.setStatusDetails({
+          message: result.error.message,
+          trace: result.error.stack
+        });
+      }
+    } else if (result.status === 'skipped') {
+      this.currentTest.setStatus(Status.SKIPPED);
+    }
+    
+    // Add attachments
+    for (const attachment of result.attachments) {
+      this.currentTest.addAttachment(
+        attachment.name,
+        attachment.contentType,
+        fs.readFileSync(attachment.path)
+      );
+    }
+    
+    // End test
+    this.currentTest.endTest();
+    this.currentTest = null;
+  }
+
+  onEnd(result: FullResult): void {
+    this.allure.endGroup();
+  }
+
+  private getSuite(suite: Suite): AllureSuite {
+    const suitePath = this.getSuitePath(suite);
+    if (!this.suites.has(suitePath)) {
+      const allureSuite = this.allure.startSuite(suite.title);
+      this.suites.set(suitePath, allureSuite);
+    }
+    return this.suites.get(suitePath)!;
+  }
+
+  private getSuitePath(suite: Suite): string {
+    const path = [];
+    let current: Suite | undefined = suite;
+    while (current) {
+      path.unshift(current.title);
+      current = current.parent;
+    }
+    return path.join(' > ');
+  }
+}
+
+// ReportingManager.ts
+export class ReportingManager {
+  private static instance: ReportingManager;
+  private reporters: Reporter[];
+
+  private constructor() {
+    this.reporters = [];
+  }
+
+  static getInstance(): ReportingManager {
+    if (!ReportingManager.instance) {
+      ReportingManager.instance = new ReportingManager();
+    }
+    return ReportingManager.instance;
+  }
+
+  addReporter(reporter: Reporter): void {
+    this.reporters.push(reporter);
+  }
+
+  getReporters(): Reporter[] {
+    return this.reporters;
+  }
+
+  async generateReport(): Promise<void> {
+    // Generate Allure report
+    await exec('allure generate ./allure-results --clean -o ./allure-report');
+  }
+}
+```
+
+# Test Strategy:
+1. Create unit tests for Allure reporter integration
+2. Test report generation with mock test results
+3. Verify screenshot and video capture functionality
+4. Test logging integration with different log levels
+5. Create integration tests that generate comprehensive reports
+6. Validate dashboard functionality and data accuracy

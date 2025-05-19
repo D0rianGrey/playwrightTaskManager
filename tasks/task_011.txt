@@ -1,0 +1,183 @@
+# Task ID: 11
+# Title: Demo Mobile Tests Implementation
+# Status: pending
+# Dependencies: 5, 7
+# Priority: low
+# Description: Create demonstration mobile tests using the framework with Appium integration to showcase mobile testing capabilities for both Android and iOS platforms.
+# Details:
+1. Create mobile screen objects:
+   - Login screen
+   - Home screen
+   - Detail screens
+   - Navigation components
+
+2. Implement mobile-specific utilities:
+   - Touch and gesture helpers
+   - Device orientation handling
+   - App state management
+
+3. Create test data generators:
+   - User credentials
+   - Application-specific data
+   - Device-specific configurations
+
+4. Implement test scenarios:
+   - App installation and launch
+   - User authentication
+   - Navigation and interaction
+   - Device-specific features
+
+5. Add cross-platform testing examples:
+   - Shared test logic
+   - Platform-specific implementations
+   - Adaptive test execution
+
+Example implementation:
+```typescript
+// LoginScreen.ts
+export class LoginScreen extends MobileScreen {
+  constructor(driver: WebdriverIO.Browser) {
+    super(driver);
+  }
+
+  defineSelectors(): Record<string, string> {
+    // Use platform-specific selectors
+    const isAndroid = this.driver.capabilities.platformName === 'Android';
+    
+    if (isAndroid) {
+      return {
+        usernameInput: 'id=com.example.app:id/username',
+        passwordInput: 'id=com.example.app:id/password',
+        loginButton: 'id=com.example.app:id/login_button',
+        errorMessage: 'id=com.example.app:id/error_message'
+      };
+    } else {
+      return {
+        usernameInput: 'name=Username',
+        passwordInput: 'name=Password',
+        loginButton: 'name=Login',
+        errorMessage: 'name=ErrorMessage'
+      };
+    }
+  }
+
+  async login(username: string, password: string): Promise<void> {
+    const usernameElement = await this.getElement('usernameInput');
+    const passwordElement = await this.getElement('passwordInput');
+    const loginButton = await this.getElement('loginButton');
+    
+    await usernameElement.setValue(username);
+    await passwordElement.setValue(password);
+    await loginButton.click();
+    
+    // Wait for login to complete
+    await this.driver.pause(2000); // Simple wait, replace with better wait strategy
+  }
+
+  async getErrorMessage(): Promise<string> {
+    try {
+      const errorElement = await this.getElement('errorMessage');
+      if (await errorElement.isDisplayed()) {
+        return await errorElement.getText();
+      }
+    } catch (e) {
+      // Element might not exist
+    }
+    return '';
+  }
+}
+
+// HomeScreen.ts
+export class HomeScreen extends MobileScreen {
+  constructor(driver: WebdriverIO.Browser) {
+    super(driver);
+  }
+
+  defineSelectors(): Record<string, string> {
+    const isAndroid = this.driver.capabilities.platformName === 'Android';
+    
+    if (isAndroid) {
+      return {
+        welcomeMessage: 'id=com.example.app:id/welcome_message',
+        menuButton: 'id=com.example.app:id/menu_button',
+        listItems: 'id=com.example.app:id/list_item',
+        logoutButton: 'id=com.example.app:id/logout_button'
+      };
+    } else {
+      return {
+        welcomeMessage: 'name=WelcomeMessage',
+        menuButton: 'name=Menu',
+        listItems: 'name=ListItem',
+        logoutButton: 'name=Logout'
+      };
+    }
+  }
+
+  async isDisplayed(): Promise<boolean> {
+    try {
+      const welcomeElement = await this.getElement('welcomeMessage');
+      return await welcomeElement.isDisplayed();
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async getWelcomeMessage(): Promise<string> {
+    const welcomeElement = await this.getElement('welcomeMessage');
+    return await welcomeElement.getText();
+  }
+
+  async openMenu(): Promise<void> {
+    const menuButton = await this.getElement('menuButton');
+    await menuButton.click();
+    await this.driver.pause(1000); // Simple wait, replace with better wait strategy
+  }
+
+  async logout(): Promise<void> {
+    await this.openMenu();
+    const logoutButton = await this.getElement('logoutButton');
+    await logoutButton.click();
+    await this.driver.pause(2000); // Simple wait, replace with better wait strategy
+  }
+}
+
+// MobileLoginTest.ts
+export class MobileLoginTest extends BaseMobileTest {
+  async executeTest(): Promise<void> {
+    // Initialize screens
+    const loginScreen = new LoginScreen(this.driver);
+    const homeScreen = new HomeScreen(this.driver);
+    
+    // Wait for app to load
+    await this.driver.pause(3000); // Simple wait, replace with better wait strategy
+    
+    // Test invalid login
+    await loginScreen.login('invalid', 'password');
+    const errorMessage = await loginScreen.getErrorMessage();
+    expect(errorMessage).toContain('Invalid credentials');
+    
+    // Test valid login
+    await loginScreen.login('testuser', 'password123');
+    
+    // Verify successful login
+    expect(await homeScreen.isDisplayed()).toBeTruthy();
+    const welcomeMessage = await homeScreen.getWelcomeMessage();
+    expect(welcomeMessage).toContain('Welcome');
+    
+    // Test logout
+    await homeScreen.logout();
+    
+    // Verify back to login screen
+    const usernameInput = await loginScreen.getElement('usernameInput');
+    expect(await usernameInput.isDisplayed()).toBeTruthy();
+  }
+}
+```
+
+# Test Strategy:
+1. Create end-to-end mobile test flows
+2. Test on both Android and iOS platforms
+3. Verify platform-specific behaviors
+4. Test orientation changes and device-specific features
+5. Validate error handling and edge cases
+6. Test app lifecycle (install, launch, background, foreground)
