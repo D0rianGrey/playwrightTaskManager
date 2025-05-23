@@ -121,3 +121,7 @@ export const Wait = {
     }
   },
 };
+
+// Export other utilities
+export * from './Logger';
+

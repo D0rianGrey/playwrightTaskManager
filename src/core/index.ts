@@ -26,3 +26,17 @@ export interface TestConfig {
 
 // Константы
 export const DEFAULT_TIMEOUT = 30000; // 30 секунд
+
+/**
+ * Core Framework Components
+ */
+
+// Re-export all core components
+export * from './BaseTest';
+export * from './ConfigManager';
+export * from './BaseReporter';
+export * from './BaseFixture';
+export * from './hooks';
+export * from './types';
+export * from './constants';
+
