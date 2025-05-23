@@ -27,6 +27,7 @@
   "license": "MIT",
   "devDependencies": {
     "@playwright/test": "^1.52.0",
+    "@types/pngjs": "^6.0.5",
     "@typescript-eslint/eslint-plugin": "^8.32.1",
     "@typescript-eslint/parser": "^8.32.1",
     "eslint": "^9.27.0",
@@ -35,6 +36,8 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "playwright": "^1.52.0"
+    "pixelmatch": "^7.1.0",
+    "playwright": "^1.52.0",
+    "pngjs": "^7.0.0"
   }
 }
