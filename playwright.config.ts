@@ -30,10 +30,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
 
   // Репортеры для вывода результатов тестирования
-  reporter: [
-    ['html', { open: 'never' }],
-    ['list', { printSteps: true }],
-  ],
+  reporter: [['allure-playwright', { outputFolder: 'allure-results' }]],
 
   // Использовать глобальную настройку для всех тестов
   use: {
